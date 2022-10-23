@@ -1,0 +1,32 @@
+---
+- name: Return "Cluster Service" info
+  ansible.windows.win_service_info:
+    name: "Cluster Service"
+  register: service_info
+
+- name: Get Service startup mode
+  set_fact:
+    service_startup_mode: "{{ service_info.services[0].start_mode }}"
+  when: service_info is defined and  service_info.exists|bool == True
+
+- name: Print service_startup_mode value
+  ansible.builtin.debug:
+    msg: "service_startup_mode={{ service_startup_mode }}"
+  when: service_startup_mode is defined
+
+- name: Set cluster_service_enabled to false by default
+  set_fact:
+    cluster_service_enabled: false
+
+- name: Update cluster_service_enabled when "Cluster Service" startup-mode is "auto"
+  set_fact:
+    cluster_service_enabled: true
+  when: 
+  - service_startup_mode is defined
+  - service_startup_mode == "auto"
+
+- name: Print cluster_service_enabled value
+  ansible.builtin.debug:
+    msg: "cluster_service_enabled={{ cluster_service_enabled }}"
+  when: cluster_service_enabled is defined
+

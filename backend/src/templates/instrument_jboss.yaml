@@ -1,0 +1,25 @@
+---
+- hosts: all
+  tasks:
+    - name: Include variables for the controller settings
+      include_vars: vars/controller.yaml
+    - include_role:
+        name: java
+        # use java role variables in the following instrumentation tasks when public: yes
+        public: yes
+      vars:
+        agent_version: ${agent_version}
+        agent_type: ${agent_type}
+        #todo remove application, tier_name necessary
+        application_name: ${application_name}
+        tier_name: ${tier_name}
+    - include_role:
+        name: instrument_jboss
+        # instrument jboss:
+      vars:
+        application_name: ${application_name}
+        tier_name: ${tier_name}
+        jboss_service: wildfly
+        app_user: wildfly
+        restart_app: ${restart_app}
+        jboss_config: ${jboss_config}

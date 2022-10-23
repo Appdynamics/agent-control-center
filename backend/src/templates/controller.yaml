@@ -1,0 +1,8 @@
+---
+controller_host_name: "{controller_host_name}"
+controller_port: "{controller_port}"
+controller_account_name: "{controller_account_name}"
+controller_account_access_key: "{controller_account_access_key}"
+enable_ssl: "{enable_ssl}"
+controller_global_analytics_account_name: "{controller_global_analytics_account_name}"
+agent_log_level: "info"

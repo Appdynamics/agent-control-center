@@ -1,0 +1,114 @@
+---
+
+- name: systemd installation block
+  block:
+  - name: Add the Agent as a Service - systemd
+    become: true
+    template:
+      src: templates/appdynamics-machine-agent.service.j2
+      dest: /etc/systemd/system/appdynamics-machine-agent.service
+      force: true
+      owner: root # In cases when Machine Agent must not run as root, you may change it.
+      group: root
+      mode: 0644
+    register: machine_agent_systemd_result
+
+  - name: Enable the Machine Agent to start at system startup - systemd
+    become: true
+    systemd:
+      name: appdynamics-machine-agent
+      enabled: yes
+      force: true # Force it to override existing symlink in case of an upgrade
+      masked: no
+  
+  # Reload systemd if it is an upgrade or re-installation
+  - name:  Reload systemd configs - systemd
+    become: true
+    systemd:
+      daemon_reload: yes
+    #when: previous_agent.stat.exists
+
+  - name: Start the agent service - systemd
+    become: true
+    systemd:
+      name: appdynamics-machine-agent
+      state: restarted
+      daemon_reload: yes
+    changed_when: false
+
+  - name: Make sure the service is running - systemd
+    command: systemctl status appdynamics-machine-agent
+    register: result
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Show Machine Agent status
+    debug:
+      var: result
+  
+  when: is_sysV | bool == False
+
+- name: SysV installation block
+  block:
+  - name: Add the Agent as a Service - SysV
+    become: true
+    template:
+      src: templates/appdynamics-machine-agent.sysv.j2
+      dest: "{{ machine_agent_dest_folder_linux }}/etc/sysconfig/appdynamics-machine-agent"
+      force: true
+      owner: root # In cases when Machine Agent must not run as root, you may change it.
+      group: root
+      mode: 0644
+    register: machine_agent_systemd_result
+
+  - name: Create symbolic link - SysV
+    become: true
+    file:
+      src: "{{ machine_agent_dest_folder_linux }}/etc/sysconfig/appdynamics-machine-agent"
+      dest: /etc/sysconfig/appdynamics-machine-agent
+      state: link
+
+  - name: Copy the machine agent to /etc/init.d
+    become: true
+    ansible.builtin.copy:
+      remote_src: yes
+      src: "{{ machine_agent_dest_folder_linux }}/etc/init.d/appdynamics-machine-agent"
+      dest: /etc/init.d/appdynamics-machine-agent
+
+  - name: Enable the Machine Agent to start at system startup - SysV
+    become: true
+    sysvinit:
+      name: appdynamics-machine-agent
+      enabled: yes
+
+  - name: Add agent as a service - SysV
+    become: true
+    command: chkconfig --add appdynamics-machine-agent
+    ignore_errors: yes
+
+  - name: Start the agent service - SysV
+    become: true
+    sysvinit:
+      name: appdynamics-machine-agent
+      state: restarted
+    changed_when: false
+
+  - name: Make sure the service is running - SysV
+    become: true
+    command: service appdynamics-machine-agent status
+    register: result
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Show Machine Agent status
+    debug:
+      var: result
+
+  when: is_sysV | bool == True
+
+- name: Clean up - remove {{ ma_agent_dest_file }}
+  become: true
+  file:
+    path: "{{ machine_agent_dest_folder_linux }}/{{ ma_agent_dest_file }}"
+    state: absent
+  changed_when: false

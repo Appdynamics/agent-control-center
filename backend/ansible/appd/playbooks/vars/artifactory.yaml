@@ -1,0 +1,4 @@
+---
+artifactory_url: "https://<server-name>.jfrog.io/artifactory/<repo>" # Update this to artifactory repo - but exclude the package name - would be something like: https://xxxxx.jfrog.io/artifactory/xxxxxx (no slash at end required)
+artifactory_username: "<user-here>"
+artifactory_password: "<password-or-token-here>"

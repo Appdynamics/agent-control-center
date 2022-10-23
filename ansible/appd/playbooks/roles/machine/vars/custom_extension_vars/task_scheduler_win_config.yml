@@ -1,0 +1,12 @@
+#Currently not used as all the config files are merged into custom_extension_win_config
+#These values need to be filled in for Task Scheduler config.xml file
+
+#Controller is defined elsewhere already
+
+# task_scheduler_appname: "100"
+# task_scheduler_oauthtoken: "test"
+
+# task_scheduler_enable_logging: "0"
+# task_scheduler_enable_events: "0"
+
+# task_scheduler_tasks: '["Task 1", "Task 2"]'

@@ -1,0 +1,13 @@
+---
+#Currently not used as all the config files are merged into custom_extension_win_config
+
+#These values need to be filled in for Event Log config.xml file
+
+# event_log_appname: "165"
+# event_log_oauthtoken: "test_extensions"
+
+# event_log_application: '["App 10", "App 11"]'
+
+# event_log_system: '["101010", "11011011"]'
+
+# windows_events_search_interval_mins: 5

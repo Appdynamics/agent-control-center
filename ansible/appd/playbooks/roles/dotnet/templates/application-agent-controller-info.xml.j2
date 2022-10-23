@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<winston>
+  <logFileDirectory directory="{{ DOTNETAGENTFOLDER }}\Logs" />
+  <logFileFolderAccessPermissions defaultAccountsEnabled="false">
+  {% for account in logFileFolderAccessPermissions %}
+    <account name="{{ account.name }}" displayName="{{ account.displayName }}" />
+  {% endfor %}
+  </logFileFolderAccessPermissions>
+<appdynamics-agent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!-- Controller configuration -->
+  <controller host="{{ controller_host_name }}" port="{{ controller_port }}" ssl="{{ appd_ssl_flag }}" enable_tls12="{{ appd_tls12_flag }}">
+    <account name="{{ account_name }}" password="{{ account_access_key }}"/>
+    {% if enable_proxy | bool %}
+    <proxy enabled="{{ enable_proxy | lower }}" host="{{ proxy_host }}" port="{{ proxy_port }}" />
+    {% endif %}
+    <!-- The application is required -->
+    <application name="{{ application_name }}" />
+    <!-- The account name and access key are required -->
+  </controller>
+
+  <!-- Machine agent configuration -->
+  {% if dotnet_machine_agent is defined %}
+  <machine-agent>
+  {% if 'machine-snapshot' in dotnet_machine_agent %}
+      <machine-snapshot{% for key, value in dotnet_machine_agent['machine-snapshot'].items() %} {{ key }}="{{ value }}"{% endfor %}/>
+  {% endif %}
+  {% if 'metrics' in dotnet_machine_agent %}
+      <metrics>
+        <perf-metrics priority-level="{{ dotnet_machine_agent['metrics']['perf-metrics']['priority-level'] }}">
+      {% for pm in dotnet_machine_agent['metrics']['perf-metrics']['metrics'] %}
+          <perf-metric name="{{ pm.name }}" />
+      {% endfor %}
+        </perf-metrics>
+      </metrics>
+  {% endif %}
+  {% if 'perf-counters' in dotnet_machine_agent %}
+      <perf-counters>
+      {% for pc in dotnet_machine_agent['perf-counters'] %}
+          <perf-counter{% for key, value in pc.items() %} {{ key }}="{{ value }}"{% endfor %}/>
+      {% endfor %}
+      </perf-counters>
+  {% endif %}
+  {% if 'instrumentation' in dotnet_machine_agent %}
+   <!--Enable thread correlation-->
+   <instrumentation>
+   {% for instrumentor in dotnet_machine_agent['instrumentation'] %}
+     <instrumentor name="{{ instrumentor.name }}" enabled="{{ instrumentor.enabled | lower }}"/>
+   {% endfor %}
+   </instrumentation>
+  {% endif %}
+  </machine-agent>
+  {% else %}
+  <machine-agent/>
+  {% endif %}
+
+  <!-- App agents configuration -->
+  <app-agents>
+    <profiler>
+      <!-- Enable runtime reinstrumentation -->
+       <runtime-reinstrumentation enabled="{{ runtime_reinstrumentation | lower }}" interval="60000" />
+    </profiler>  
+     <IIS>
+      <automatic enabled="{{ monitor_all_IIS_apps | lower }}" />
+    <applications>
+    </applications>
+    </IIS>  
+    <!-- For a standalone application or Windows service the executable name should be provided -->
+    <!-- as the standalone-application executable attribute -->
+    <standalone-applications>
+    {% if standalone_applications is defined and standalone_applications | length > 0 %}
+      {% for app in standalone_applications %}
+      <standalone-application executable="{{ app['executable'] }}"{% if 'command-line' in app %} command-line="{{ app['command-line'] }}"{% endif %}>
+        <tier name="{{ app['tier'] }}" />
+      </standalone-application>
+      {% endfor %}
+    {% endif %}
+    </standalone-applications>
+  </app-agents>
+</appdynamics-agent>
+</winston>

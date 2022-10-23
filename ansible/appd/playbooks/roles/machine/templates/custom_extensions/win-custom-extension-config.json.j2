@@ -1,0 +1,53 @@
+{
+    "appNameOrID": "{{ win_appname }}",
+    "controllerHost": "{{ controller_host_name }}",
+    "OAuthToken": "{{ win_oauthtoken }}",
+
+    "EnableLogging": "{{ win_enable_logging }}",
+    "EnableEvents": "{{ win_enable_events }}",
+
+    "EnableWindowsEventMonitor": "{{ win_enable_event_monitor }}",
+    "EnableWindowsServiceMonitor": "{{ win_enable_service_monitor }}",
+    "EnableWindowsTaskSchedulerMonitor": "{{ win_enable_task_scheduler_monitor }}",
+    "EnableClusterDiskMonitor": "{{ win_enable_cluster_disk_monitor }}",
+    "EnableClusterNetworkMonitor": "{{ win_enable_cluster_network_monitor }}",
+    "EnableClusterNodeMonitor": "{{ win_enable_cluster_node_monitor }}",
+    "EnableClusterRolesMonitor": "{{ win_enable_cluster_roles_monitor }}",
+
+    "EnableClusterDiskSpaceMonitor": "{{ win_enable_cluster_disk_space_monitor }}",
+    "EnableClusterDiskStateMonitor": "{{ win_enable_cluster_disk_state_monitor }}",
+    "EnableIISPoolMonitor": "{{ win_enable_iis_pool_monitor }}",
+    
+    "Windows_Disk_Space_Match_RegexPattern": "*.MSSQL.*",
+	
+	"MonitoredIISPools": [
+        {
+            "IISPools": [".NET v4.5", ".NET v4.5 Classic", "DefaultAppPool", "TrisoftAppPoollSHCM", "TrisoftAppPoollSHCS", "TrisoftAppPoollSHSTS", "TrisoftAppPoollSHWS"]
+        }
+    ],
+
+    "windows_events_log": [{
+            "Application": {{event_log_application}}
+	},
+	{
+            "Security": {{event_log_security}}
+	},
+	{
+            "System": {{event_log_system}}
+        }
+    ],
+    "windows_events_search_interval_mins": {{ windows_events_search_interval_mins }},
+
+    "MonitoredTasksList": [
+        {
+            "Tasks": {{ task_scheduler_tasks }}
+        }
+    ],
+
+    "MonitoredServicesList": [
+        {
+           "Services": {{ service_monitor_services }}
+        }
+    ]
+
+}

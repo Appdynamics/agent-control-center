@@ -1,0 +1,119 @@
+# Define Agent Type and Version
+agent_version: 21.9.0.3184 #update this when upgrading
+agent_type: machine #update this when upgrading
+
+# valid values: install|update
+input_method: install
+
+#machine_hierarchy: "{{ 'Windows' if ansible_os_family == 'Windows' else 'Linux' }}|" # Make sure it ends with a |
+hierarchy_file_path_lin: "/tmp/cmdb-discovery.yml"
+hierarchy_file_path_win: "C:/tmp/cmdb-discovery.yml"
+hierarchy_department_value: "CoreIT"
+
+machine_custom_tags: # non-mandatory
+  department: [ "CoreIT" ]
+metadata_file_path: "/tmp/cmdb-discovery.yml" # non-mandatory
+
+sim_enabled: "true"
+agent_log_level: "info"
+host_name: '{{ ansible_fqdn }}' # fully qualified domain name (failing that host_name)
+
+backup_machine_agent_files: false
+
+ma_agent_dest_file: "machine-agent.zip"
+
+# valid values doe source_location: local | artifactory
+agent_source_location: artifactory                
+custom_extensions_source_location: artifactory 
+
+account_access_key: "{{ controller_account_access_key }}"
+account_name: "{{ controller_account_name }}"
+
+# config properties docs - https://docs.appdynamics.com/display/latest/Machine+Agent+Configuration+Properties
+# Can be used to configure the proxy for the agent 
+# mind the space between each property for proxies - Optional - eg: -Dappdynamics.http.proxyHost=IP address -Dappdynamics.http.proxyPort=9090
+# check with ps -ef | grep machine if Machine agent not appearing
+java_system_properties: "" 
+
+# Analytics settings
+analytics_event_endpoint: ""
+enable_analytics_agent: "false"
+
+ma_agent_lin_source_file: "machineagent-bundle-64bit-linux-{{ agent_version }}.zip"
+ma_agent_win_source_file: "machineagent-bundle-64bit-windows-{{ agent_version }}.zip"
+
+# Application settings
+application_name: "" # applciation name, empty by default
+tier_name: "" # tier name, empty by default, should be a service name, leave blank for deployments without an application agent
+
+# AppDynamics user on target machine 
+create_appdynamics_user: yes
+create_appdynamics_local_user: true # todo currently defaults to yes 
+appdynamics_user_id: "" # UID, empty by default
+appdynamics_group_id: "" # GID, empty by default
+
+# Encrypt Agent Credentials
+# store_filename file has to already be created to enable this functionality
+encrypted_credentials_enable: false
+encrypted_credentials_store_filename: "" # important: package this file together with agent binaries (path to file, e.g. /opt/appdynamics/machine-agent/secretKeyStoreEncrypted)
+encrypted_credentials_store_password: "" # important: obfuscated credentials store password (not plaintext)
+
+# controller_environment: "prod"
+
+# Apply different custom extension configuration and/or deploy additional extensions
+is_support_group_paas: false # true / false
+
+# Enable custom extensions
+enable_custom_extensions: false
+
+custom_extensions_add_java_system_properties: "-Xmx512m -Dappdynamics.agent.maxMetrics=650"
+
+custom_extensions_windows: 
+  WindowsCustomExtensions:
+    enabled: true  
+    extension_folder: 'WindowsCustomExtensions'
+    extension_file: 'WindowsCustomExtensions.zip' 
+    extension_template: "win-custom-extension-config.json.j2"
+    extension_vars: "custom_extension_win_config" # no file extension
+    extension_business_logic: "windows_custom_extension_business_logic"
+
+custom_extensions_linux:
+  ProcessMonitor:
+    enabled: true 
+    extension_folder: 'ProcessMonitor'
+    extension_file: 'ProcessMonitor_Linux.zip'
+    extension_template: "linux-process-monitor-config.json.j2"
+    extension_vars: "process_monitor_linux_config" # no file extension
+    extension_business_logic: "linux_process_monitor_business_logic"
+
+  LogMonitor:
+    enabled: true  
+    extension_folder: 'LogMonitor'
+    extension_file: 'LogMonitor_Linux.zip'
+    extension_template: "linux-log-monitor-config.json.j2"
+    extension_vars: "log_monitor_linux_config" # no file extension
+
+  LinuxInodeUtilization:
+    enabled: true  
+    extension_folder: 'LinuxInodeUtilization'
+    extension_file: 'LinuxInodeUtilization.zip'
+
+  LinuxMountStatus:
+    enabled: true  
+    extension_folder: 'LinuxMountStatus'
+    extension_file: 'LinuxMountStatus.zip'
+
+  LinuxReadOnlyAlert:
+    enabled: true  
+    extension_folder: 'LinuxReadOnlyAlert'
+    extension_file: 'LinuxReadOnlyAlert.zip'
+
+  UptimeInSeconds:
+    enabled: true  
+    extension_folder: 'UptimeInSeconds'
+    extension_file: 'UptimeInSeconds.zip'
+
+  LinuxDiskUsage:
+    enabled: true  
+    extension_folder: 'LinuxDiskUsage'
+    extension_file: 'LinuxDiskUsage.zip'

@@ -1,0 +1,45 @@
+---
+
+# - name: Print user settings
+#   ansible.builtin.debug:
+#     msg: Creating user with ID {{ appdynamics_user_id }} and group ID {{ appdynamics_group_id }}
+
+- name: Make sure we have a '"{{ appdynamics_user }}"' group (with GID)
+  become: true
+  group:
+    name: "{{ appdynamics_user }}"
+    state: present
+    gid: "{{ appdynamics_group_id }}"
+    local: yes
+  when: (appdynamics_group_id is defined) and (appdynamics_group_id|length > 0)
+
+- name: Make sure we have a '"{{ appdynamics_user }}"' group (without GID)
+  become: true
+  group:
+    name: "{{ appdynamics_user }}"
+    state: present
+    local: yes
+  when: (appdynamics_group_id is not defined) or (appdynamics_group_id|length == 0)
+
+- name: "Add '{{ appdynamics_user }}' user, that belongs to '{{ appdynamics_user }}' group (with UID)"
+  become: true
+  user:
+    name: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_group_id }}"
+    append: yes
+    local: yes
+    uid: "{{ appdynamics_user_id }}"
+    state: present
+  when: (appdynamics_user_id is defined) and (appdynamics_user_id|length > 0)
+
+- name: "Add '{{ appdynamics_user }}' user, that belongs to '{{ appdynamics_user }}' group (without UID)"
+  become: true
+  user:
+    name: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_user }}"
+    groups: 
+    - "{{ appdynamics_user }}"
+    append: no
+    local: yes
+    state: present
+  when: (appdynamics_user_id is not defined) or (appdynamics_user_id|length == 0)

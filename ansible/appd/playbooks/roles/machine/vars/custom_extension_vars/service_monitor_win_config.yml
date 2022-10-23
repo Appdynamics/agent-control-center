@@ -1,0 +1,12 @@
+#Currently not used as all the config files are merged into custom_extension_win_config
+#These values need to be filled in for Service Monitor config.xml file
+
+#Controller is defined elsewhere already
+   
+# service_monitor_appname: "100"
+# service_monitor_oauthtoken: "test"
+
+# service_monitor_enable_logging: "0"
+# service_monitor_enable_events: "0"
+
+# service_monitor_services: '["SMS Agent Host",  "SplunkForwarder Service"]'

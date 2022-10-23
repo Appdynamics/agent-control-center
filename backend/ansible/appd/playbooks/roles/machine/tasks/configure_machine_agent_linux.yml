@@ -1,0 +1,80 @@
+---
+
+  - name: Check if Machine Agent is already running
+    stat:
+      path: "{{ machine_agent_dest_folder_linux }}/machineagent.jar"
+    register: previous_agent
+
+  - name: Backup existing Machine Agent
+    archive:
+      path: "{{ machine_agent_dest_folder_linux }}"
+      dest: "/tmp/machine_agent.{{ ansible_date_time.iso8601 }}.zip"
+      mode: 0755
+    when: 
+      - previous_agent.stat.exists
+      - backup_machine_agent_files | bool
+    changed_when: false
+
+  - name: Populate service facts
+    ansible.builtin.service_facts:
+
+  - name: Get machine agent service
+    ansible.builtin.set_fact:
+      machine_agent_service: ansible_facts.services["appdynamics-machine-agent.service"]
+
+  - name: Print service state
+    ansible.builtin.debug:
+      var: "{{ machine_agent_service }}.state"
+    when: machine_agent_service is defined
+
+  - name: Stop Machine Agent service
+    become: true
+    systemd:
+      name: appdynamics-machine-agent
+      state: stopped
+      daemon_reload: yes
+    changed_when: false
+    when: 
+    - ansible_facts.services["appdynamics-machine-agent.service"] is defined 
+    - is_sysV | bool == False
+
+  - name: Stop Service
+    service: name=appdynamics-machine-agent state=stopped
+    when:
+      - ansible_facts.services["appdynamics-machine-agent.service"] is defined 
+      - is_sysV | bool == True
+
+  - name: Configure Machine Agent controller-info.xml file
+    become: true
+    template:
+      src: templates/machine-agent-controller-info.xml.j2
+      dest: '{{ machine_agent_dest_folder_linux }}/conf/controller-info.xml'
+      owner: "{{ appdynamics_user }}"
+      group: "{{ appdynamics_user }}"
+      mode: 0755
+    changed_when: false
+    when: 
+      - application_name is not defined or application_name | length == 0
+
+  - name: Override Machine Agent controller-info.xml if application_name is set
+    become: true
+    template:
+      src: templates/machine-agent-controller-info.application.xml.j2
+      dest: '{{ machine_agent_dest_folder_linux }}/conf/controller-info.xml'
+      owner: "{{ appdynamics_user }}"
+      group: "{{ appdynamics_user }}"
+      mode: 0755
+    changed_when: false
+    when: 
+      - application_name is defined and application_name | length > 0
+
+  # # Update the Log4j setting to apply the desired log level to all the loggers
+  # # listed in the {{agent_loggers}} list.
+  # - name: Set the log level on the agent (if != info, which it is by default)
+  #   include_role:
+  #     name: logger
+  #   vars:
+  #     logger_role_standalone: false # no need to check if the dir exists
+  #   when: agent_log_level|lower != 'info'
+
+ 

@@ -1,0 +1,128 @@
+---
+# App owners would either need to chown the entire agent folder to their app's user OR grant their app's user read/write access to the agent folder
+- name: Java Linux Block
+  become: true
+  block:
+    - name: Clean out orphanned {{ java_agent_dest_file }}
+      file:
+        path: "{{ java_agent_dest_folder_linux }}/{{ java_agent_dest_file }}"
+        state: absent
+      changed_when: false # this ensures this task is idempotent
+
+    - name: Check if java agent exists
+      stat:
+        path: "{{ java_agent_dest_folder_linux }}/javaagent.jar"
+      register: previous_agent
+
+    - name: Backup old java agent to /tmp folder
+      archive:
+        path: "{{ java_agent_dest_folder_linux }}"
+        dest: "/tmp/java_agent.{{ ansible_date_time.iso8601 }}.zip"
+        mode: 0755
+      when: previous_agent.stat.exists
+      changed_when: false
+
+    - name: Clean up old agent after
+      file:
+        path: "{{ java_agent_dest_folder_linux }}"
+        state: absent
+      changed_when: false
+
+    - name: Ensures application agent dir exists
+      file:
+        path: "{{ java_agent_dest_folder_linux }}/"
+        state: directory
+        mode: 0755
+        recurse: yes
+      changed_when: false # this ensures this task is idempotent
+
+     # add delegate_to: localhost for customers who are unable to download on the remote server
+    # - name: Download Java Agent
+    #   get_url:
+    #     url: "{{ agent_download_url.stdout }}"
+    #     dest: "{{ java_agent_dest_folder_linux }}/{{ java_agent_dest_file }}"
+    #     force: true # download a new file even if javaagent.zip exists.
+    #   changed_when: false
+    #   register: result
+    #   failed_when: result.status_code != 200
+    - name: Copy Agent files - from Local
+      become: true
+      ansible.builtin.copy:
+        src: "{{ java_agent_source_file }}"
+        dest: "{{ java_agent_dest_folder_linux }}/{{ java_agent_dest_file }}"
+        mode: 0755
+      register: result
+
+    - name: Print download results
+      debug:
+        msg: "{{ result }}"
+
+    # Keeping downloading and unziping seperate tasks
+    # as not all customers are allowed to download on the remote servers.
+    - name: Unzip the Java agent file
+      unarchive:
+        #src: "{{ agent_download_url.stdout }}"
+        src: "{{ java_agent_dest_folder_linux }}/{{ java_agent_dest_file }}"
+        dest: "{{ java_agent_dest_folder_linux }}"
+        mode: 0755
+        remote_src: yes
+      changed_when: false
+
+    - name: Configure Java agent's controller-info.xml
+      template:
+        src: templates/application-agent-controller-info.xml.j2
+        dest: '{{ java_agent_dest_folder_linux }}/conf/controller-info.xml'
+        mode: 0755
+      changed_when: false
+
+    - name: Find the version specific directory name
+      find:
+        paths: "{{ java_agent_dest_folder_linux }}"
+        patterns: "ver{{ agent_version }}*"
+        file_type: directory
+      register: result
+
+    - name: Set the version folder fact
+      set_fact:
+        java_agent_ver_folder: "{{ result.files[0].path }}" # "{{ ver.stdout | regex_replace ('\\r\\n', '') }}"
+
+    - name: Copy controller-info.xml to the versioned agent folder
+      shell: cp {{ java_agent_dest_folder_linux }}/conf/controller-info.xml  {{ java_agent_ver_folder }}/conf/
+      changed_when: false
+
+    # Update the Log4j setting to apply the desired log level to all the loggers
+    # listed in the {{agent_loggers}} list.
+    - name: Set the log level on the agent (if != info, which it is by default)
+      include_role:
+        name: logger
+      vars:
+        logger_role_standalone: false # the role is not being used on its own (so we need not check if the agent dir exists for example )
+      when: agent_log_level|lower != 'info'
+
+    - name: Recursively change ownership of the Java agent directory
+      file:
+        path: "{{ java_agent_dest_folder_linux }}"
+        recurse: yes
+        owner: "{{ agent_dir_permission.user }}"
+        group: "{{ agent_dir_permission.group }}"
+      changed_when: false
+
+    - name: "Make java agent log and conf dirs writable to {{ agent_dir_permission.user }} user and {{ agent_dir_permission.group }} group"
+      file:
+        path: "{{ item }}"
+        recurse: yes
+        state: directory
+        owner: "{{ agent_dir_permission.user }}"
+        group: "{{ agent_dir_permission.group }}"
+        mode: '0775'
+      loop:
+        - "{{ java_agent_ver_folder }}/logs"
+        - "{{ java_agent_ver_folder }}/conf"
+        - "{{ java_agent_dest_folder_linux }}/conf"
+      changed_when: false
+
+    - name: Clean up - remove {{ java_agent_dest_file }}
+      file:
+        path: "{{ java_agent_dest_folder_linux }}/{{ java_agent_dest_file }}"
+        state: absent
+      changed_when: false # this ensures this task is idempotent

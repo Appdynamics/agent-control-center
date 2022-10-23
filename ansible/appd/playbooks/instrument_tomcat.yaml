@@ -1,0 +1,22 @@
+---
+- hosts: ansible-1
+  roles:
+    - role: java
+      vars:
+        agent_version: 22.9.0.34210
+        agent_type: java8
+  pre_tasks:
+    - name: Include variables for the controller settings
+      include_vars: vars/controller.yaml
+  tasks:
+    - include_role:
+        name: instrument_tomcat
+      vars:
+        application_name: fdumont-tomcat-centos-1
+        tier_name: Tomcat
+        tomcat_config: /opt/apache-tomcat-8.5.79/bin/setenv.sh
+        app_user: root
+        # tomcat_service: tomcat8
+        restart_app: yes
+        init_and_validate_agent_variables: true
+

@@ -1,0 +1,14 @@
+---
+- hosts: all
+  tasks:
+    - name: Include variables for the controller settings
+      include_vars: ../vars/controller.yaml
+
+    - include_role:
+        name: java
+      vars:
+        # Define Agent Type and Version
+        agent_version: "{agent_version}"
+        agent_type: "{agent_type}"
+        application_name: "{application_name}"
+        tier_name: "{tier_name}"

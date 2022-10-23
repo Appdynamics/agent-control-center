@@ -1,0 +1,164 @@
+---
+
+  - name: Machine Agent linux Block
+    become: true
+    block:
+    #- include_tasks: appd_sudoer.yml
+    - name: Ensures machine agent {{ machine_agent_dest_folder_linux }} dir exists
+      file:
+        path: "{{ machine_agent_dest_folder_linux }}/"
+        state: directory
+        mode: 0755
+        owner: "{{ appdynamics_user }}"
+        group: "{{ appdynamics_user }}"
+
+  - name: Check if Machine Agent is already running
+    stat:
+      path: "{{ machine_agent_dest_folder_linux }}/machineagent.jar"
+    register: previous_agent
+
+  - name: Backup existing Machine Agent
+    archive:
+      path: "{{ machine_agent_dest_folder_linux }}"
+      dest: "/tmp/machine_agent.{{ ansible_date_time.iso8601 }}.zip"
+      mode: 0755
+    when: 
+      - previous_agent.stat.exists
+      - backup_machine_agent_files | bool
+    changed_when: false
+
+  
+
+  - name: Populate service facts
+    ansible.builtin.service_facts:
+
+  - name: Get machine agent service
+    ansible.builtin.set_fact:
+      machine_agent_service: ansible_facts.services["appdynamics-machine-agent.service"]
+
+  - name: Print service state
+    ansible.builtin.debug:
+      var: "{{ machine_agent_service }}.state"
+    when: machine_agent_service is defined
+
+  - name: Stop Machine Agent service
+    become: true
+    systemd:
+      name: appdynamics-machine-agent
+      state: stopped
+      daemon_reload: yes
+    changed_when: false
+    when: 
+    - ansible_facts.services["appdynamics-machine-agent.service"] is defined 
+    - is_sysV | bool == False
+
+  - name: Stop Service
+    service: name=appdynamics-machine-agent state=stopped
+    when:
+      - ansible_facts.services["appdynamics-machine-agent.service"] is defined 
+      - is_sysV | bool == True
+
+  - name: Clean up old Machine Agent binaries after backup
+    become: true
+    file:
+      path: "{{ machine_agent_dest_folder_linux }}"
+      state: absent
+    changed_when: false
+
+  - name: Re-create the machine agent {{ machine_agent_dest_folder_linux }} dir
+    become: true
+    file:
+      path: "{{ machine_agent_dest_folder_linux }}/"
+      state: directory
+      mode: 0755
+      owner: "{{ appdynamics_user }}"
+      group: "{{ appdynamics_user }}"
+    changed_when: false
+
+  - name: Downloading Linux Machine Agent
+    block:
+
+    - name: Artifactory URL must be provided
+      fail:
+        msg: "The variable 'artifactory_url' is empty"
+      when: 
+        - (artifactory_url is not defined) or (artifactory_url|length == 0)
+        - agent_source_location == 'artifactory'
+
+    - name: Check if Machine Agent file exists - Remote URL
+      uri:
+        url: '{{ artifactory_url }}/{{ ma_agent_lin_source_file }}'
+        method: HEAD
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+      register: uri_test
+      # fail with error if status is unexpected
+      failed_when: uri_test.status is undefined or uri_test.status <= 0 or uri_test.status >=400
+      when: agent_source_location == 'artifactory'
+
+    - name: Downloading Machine Agent - Remote URL
+      become: true
+      get_url:
+        url: '{{ artifactory_url }}/{{ ma_agent_lin_source_file }}'
+        dest: "{{ machine_agent_dest_folder_linux }}/{{ ma_agent_dest_file }}"
+        username: "{{ artifactory_username }}"
+        password: "{{ artifactory_password }}"
+        force: true
+      no_log: true #To prevent passwords to be on logs
+      changed_when: false
+      register: result
+      failed_when: result.status_code != 200
+      when: agent_source_location == 'artifactory'
+
+    - name: Copy Machine Agent files - from Local
+      become: true
+      ansible.builtin.copy:
+        src: "{{ ma_agent_lin_source_file }}"
+        dest: "{{ machine_agent_dest_folder_linux }}/{{ ma_agent_dest_file }}"
+        mode: 0755
+      when: agent_source_location == 'local'
+
+  - name: Unzip the Machine agent file
+    become: true
+    unarchive:
+      src:  "{{ machine_agent_dest_folder_linux }}/{{ ma_agent_dest_file }}"
+      dest: "{{ machine_agent_dest_folder_linux }}"
+      owner: "{{ appdynamics_user }}"
+      group: "{{ appdynamics_user }}"
+      mode: 0755
+      remote_src: yes
+    changed_when: false
+
+  # - name: Configure Machine Agent controller-info.xml file
+  #   become: true
+  #   template:
+  #     src: templates/machine-agent-controller-info.xml.j2
+  #     dest: '{{ machine_agent_dest_folder_linux }}/conf/controller-info.xml'
+  #     owner: "{{ appdynamics_user }}"
+  #     group: "{{ appdynamics_user }}"
+  #     mode: 0755
+  #   changed_when: false
+  #   when: 
+  #     - application_name is not defined or application_name | length == 0
+
+  # - name: Override Machine Agent controller-info.xml if application_name is set
+  #   become: true
+  #   template:
+  #     src: templates/machine-agent-controller-info.application.xml.j2
+  #     dest: '{{ machine_agent_dest_folder_linux }}/conf/controller-info.xml'
+  #     owner: "{{ appdynamics_user }}"
+  #     group: "{{ appdynamics_user }}"
+  #     mode: 0755
+  #   changed_when: false
+  #   when: 
+  #     - application_name is defined and application_name | length > 0
+
+
+  - name: Ensure machine agent file is executable
+    become: true
+    file:
+      path: "{{ machine_agent_dest_folder_linux }}/bin/machine-agent"
+      mode: 0755
+
+  - include_tasks: configure_log_analytics_linux.yml
+    when: enable_analytics_agent | bool

@@ -1,0 +1,20 @@
+---
+
+# This installs the Machine Agent for Windows
+# Will run after downloading Machine agent + configuring custom extensions
+
+- name: 'Install machine agent service'
+  win_command: "cscript.exe {{ machine_agent_dest_folder_win }}/InstallService.vbs {{ java_system_properties }}"
+  register: install_win_service_result
+  changed_when: false
+
+- name: Install service result
+  debug:
+    var: install_win_service_result
+
+- name: Clean up - remove {{ ma_agent_dest_file }}
+  win_file:
+    path: "{{ machine_agent_dest_folder_win }}/{{ ma_agent_dest_file }}"
+    state: absent
+  changed_when: false
+

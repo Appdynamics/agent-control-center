@@ -1,0 +1,116 @@
+---
+
+- name: Re-create the extension dir
+  become: true
+  file:
+    path: "{{ machine_agent_dest_folder_linux }}/monitors/{{ item.value.extension_folder }}"
+    state: directory
+    owner: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_user }}"
+  changed_when: false
+  with_dict: "{{ custom_extensions_linux }}"
+  when: 
+    - item.value.enabled | bool == True
+
+- name: Downloading Linux Machine Agent Custom Extensions
+  block:
+    - name: Artifactory URL must be provided
+      fail:
+        msg: "The variable 'artifactory_url' is empty"
+      when: 
+        - (artifactory_url is not defined) or (artifactory_url|length == 0)
+        - custom_extensions_source_location == 'artifactory'
+
+    - name: Check if custom extension file exists
+      uri:
+        url: '{{ artifactory_url }}/{{ item.value.extension_file }}'
+        method: HEAD
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+      register: uri_test
+      # fail with error if status is unexpected
+      failed_when: uri_test.status is undefined or uri_test.status <= 0 or uri_test.status >=400
+      with_dict: "{{ custom_extensions_linux }}"
+      when: 
+        - item.value.enabled | bool == True
+        - custom_extensions_source_location == 'artifactory'
+
+    # Downloading custom extension
+    - name: Downloading Linux custom extensions - remote URL
+      become: true
+      get_url:
+        url: '{{ artifactory_url }}/{{ item.value.extension_file }}'
+        dest: "{{ machine_agent_dest_folder_linux }}/monitors"
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+        force: true
+      no_log: false #To prevent passwords to be on logs
+      changed_when: false
+      register: result
+      #failed_when: result.status != 200
+      with_dict: "{{ custom_extensions_linux }}"
+      when: 
+        - item.value.enabled | bool == True
+        - custom_extensions_source_location == 'artifactory'
+
+    - name: Copying Linux custom extensions - from Local
+      become: true
+      ansible.builtin.copy:
+        src: "{{ item.value.extension_file }}"
+        dest: "{{ machine_agent_dest_folder_linux }}/monitors"
+        mode: 0755
+      with_dict: "{{ custom_extensions_linux }}"
+      when: 
+        - item.value.enabled | bool == True
+        - custom_extensions_source_location == 'local'
+
+- name: Load in custom extension variables
+  include_vars:
+    file: custom_extension_vars/{{ item.value.extension_vars }}.yml
+  with_dict: "{{ custom_extensions_linux }}"
+  when: item.value.extension_vars is defined
+
+- name: Unzip extension file
+  become: true
+  unarchive:
+    src: "{{ machine_agent_dest_folder_linux }}/monitors/{{ item.value.extension_file }}"
+    dest: "{{ machine_agent_dest_folder_linux }}/monitors/{{ item.value.extension_folder }}"
+    owner: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_user }}"
+    mode: 0755
+    remote_src: yes
+  changed_when: false
+  with_dict: "{{ custom_extensions_linux }}"
+  when: 
+    - item.value.enabled | bool == True
+
+- name: Clean up - remove {{ item.value.extension_file }}
+  become: true
+  file:
+    path: "{{ machine_agent_dest_folder_linux }}/monitors/{{ item.value.extension_file }}"
+    state: absent
+  changed_when: false
+  with_dict: "{{ custom_extensions_linux }}"
+  when: 
+    - item.value.enabled | bool == True
+
+## Include custom business logic when defined
+- include_tasks: custom_extension_business_logic/{{ item.value.extension_business_logic }}.yml
+  with_dict: "{{ custom_extensions_linux }}"
+  when: 
+    - item.value.enabled | bool == True
+    - item.value.extension_business_logic is defined
+
+- name: Configure Custom Extension config file - if Custom Extension is enabled
+  become: true
+  template:
+    src: "templates/custom_extensions/{{ item.value.extension_template }}"
+    dest: '{{ machine_agent_dest_folder_linux }}/monitors/{{ item.value.extension_folder }}/config.yml'
+    owner: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_user }}"
+    mode: 0755
+  changed_when: false
+  with_dict: "{{ custom_extensions_linux }}"
+  when: 
+    - item.value.enabled | bool == True
+    - item.value.extension_template is defined

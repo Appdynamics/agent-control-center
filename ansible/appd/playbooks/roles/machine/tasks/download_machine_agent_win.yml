@@ -1,0 +1,146 @@
+---
+
+- name: Ensures machine agent {{ machine_agent_dest_folder_win }} dir exists
+  win_file:
+    path: "{{ machine_agent_dest_folder_win }}"
+    state: directory
+
+- name: Check if Machine Agent is already installed
+  win_stat:
+    path: "{{ machine_agent_dest_folder_win }}/InstallService.vbs"
+  register: previous_agent
+
+#using Powershell as win_zip module doesn't exist in Ansible - 10/2020
+- name: Backup Machine Agent to  C:\Windows\Temp folder
+  win_shell: "Compress-Archive -Path {{ machine_agent_dest_folder_win }} -DestinationPath  C:/Windows/Temp/machine_agent.{{ ansible_date_time.iso8601 }}.zip -Force"
+  when: 
+    - previous_agent.stat.exists
+    - backup_machine_agent_files | bool
+  changed_when: false
+
+- name: Remove StdIn.Read in the UninstallService.vbs file which stops the playbook from returning
+  win_lineinfile:
+    dest: '{{ machine_agent_dest_folder_win }}/UninstallService.vbs'
+    regexp: "^WScript.StdIn.Read"
+    state: absent
+  register: remove_read_std_in_result
+  when: previous_agent.stat.exists
+  changed_when: false
+
+- name: Remove the machine agent service
+  win_command: cscript.exe "{{ machine_agent_dest_folder_win }}/UninstallService.vbs"
+  register: install_win_service_result
+  when: previous_agent.stat.exists
+  changed_when: false
+
+- name: Clean up old agent after backup
+  win_shell: "Remove-Item {{ machine_agent_dest_folder_win }}/* -Recurse"
+  args:
+      warn: false
+  when: previous_agent.stat.exists
+  changed_when: false
+
+# - name: Adjust the Machine agent file name to match the target OS
+#   set_fact:
+#     agent_file: "machineagent-bundle-64bit-windows-{{ agent_version }}.zip"
+#   when: ansible_os_family == 'Windows' and agent_type == 'machine'
+
+- name: Downloading Windows Machine Agent
+  block:
+
+    - name: Artifactory URL must be provided
+      fail:
+        msg: "The variable 'artifactory_url' is empty"
+      when: 
+        - (artifactory_url is not defined) or (artifactory_url|length == 0)
+        - agent_source_location == 'artifactory'
+
+    - name: Check if Machine Agent file exists - Remote URL
+      win_uri:
+        url: '{{ artifactory_url }}/{{ ma_agent_win_source_file }}'
+        method: HEAD
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+      register: uri_test
+      # fail with error if status is unexpected
+      failed_when: uri_test.status_code is undefined or uri_test.status_code <= 0 or uri_test.status_code >=400
+      when: agent_source_location == 'artifactory'
+
+    - name: Downloading Windows Machine Agent - Remote URL
+      win_get_url:
+        url: '{{ artifactory_url }}/{{ ma_agent_win_source_file }}'
+        dest: "{{ machine_agent_dest_folder_win }}/{{ ma_agent_dest_file }}"
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+        force: true
+      no_log: true #To prevent passwords to be on logs
+      changed_when: false
+      register: result
+      failed_when: result.status_code != 200
+      when: agent_source_location == 'artifactory'
+
+    - name: Downloading Windows Machine Agent - to localhost
+      win_get_url:
+        url: '{{ artifactory_url }}/{{ ma_agent_win_source_file }}'
+        dest: "{{ machine_agent_dest_folder_win }}/{{ ma_agent_dest_file }}"
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+        force: true
+      no_log: true #To prevent passwords to be on logs
+      changed_when: false
+      register: result
+      failed_when: result.status_code != 200
+      when: agent_source_location == 'artifactory'
+
+    - name: Copy Machine Agent files - from Local
+      ansible.windows.win_copy:
+        src: "{{ ma_agent_win_source_file }}"
+        dest: "{{ machine_agent_dest_folder_win }}/{{ ma_agent_dest_file }}"
+        mode: 0755
+      when: agent_source_location == 'local'
+
+- name: Unzip machine agent file
+  win_unzip:
+    src: "{{ machine_agent_dest_folder_win }}/{{ ma_agent_dest_file }}"
+    dest: "{{ machine_agent_dest_folder_win }}"
+    remote_src: yes
+  changed_when: false
+
+- name: Configure machine-agent controller-info.xml
+  template:
+    src: templates/win-machine-agent-controller-info.xml.j2
+    dest: '{{ machine_agent_dest_folder_win }}/conf/controller-info.xml'
+    force: yes
+  changed_when: false
+  when: 
+    - application_name is not defined or application_name | length == 0
+
+- name: Override machine-agent controller-info.xml if application_name is set
+  template:
+    src: templates/win-machine-agent-controller-info.application.xml.j2
+    dest: '{{ machine_agent_dest_folder_win }}/conf/controller-info.xml'
+    force: yes
+  changed_when: false
+  when: 
+    - application_name is defined and application_name | length > 0
+
+- name: Remove StdIn.Read in the InstallService.vbs file which stops the playbook from returning
+  win_lineinfile:
+    dest: '{{ machine_agent_dest_folder_win }}/InstallService.vbs'
+    regexp: "^WScript.StdIn.Read"
+    state: absent
+  register: remove_read_std_in_result
+  changed_when: false
+
+# # Update the Log4j setting to apply the desired log level to all the loggers
+# # listed in the {{agent_loggers}} list.
+# - name: Set the log level on the agent (if != info, which it is by default)
+#   include_role:
+#     name: logger
+#   vars:
+#     logger_role_standalone: false # no need to check if the dir exists
+#   when: agent_log_level|lower != 'info'
+
+- include_tasks: configure_log_analytics_win.yml
+  when: enable_analytics_agent | bool
+

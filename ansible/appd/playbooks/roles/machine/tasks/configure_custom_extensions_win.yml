@@ -1,0 +1,142 @@
+---
+
+- name: Print extensions setting
+  debug:
+    msg: "Adding custom extension: {{ item.key }}!"
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+    - item.value.enabled|bool == True
+    - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+
+
+- name: Downloading Windows Machine Agent Custom Extensions
+  block:
+
+    - name: Artifactory URL must be provided
+      fail:
+        msg: "The variable 'artifactory_url' is empty"
+      when: 
+        - (artifactory_url is not defined) or (artifactory_url|length == 0)
+        - custom_extensions_source_location == 'artifactory'
+
+    - name: Check if custom extension file exists
+      win_uri:
+        url: '{{ artifactory_url }}/{{ item.value.extension_file }}'
+        method: HEAD
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+      register: uri_test
+      # fail with error if status is unexpected
+      failed_when: uri_test.status_code is undefined or uri_test.status_code <= 0 or uri_test.status_code >=400
+      with_dict: "{{ custom_extensions_windows }}"
+      when: 
+        - item.value.enabled|bool == True
+        - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+        - custom_extensions_source_location == 'artifactory'
+
+    # Downloading custom extension
+    - name: Downloading Windows custom extensions - remote URL
+      win_get_url:
+        url: '{{ artifactory_url }}/{{ item.value.extension_file }}'
+        dest: "{{ machine_agent_dest_folder_win }}/monitors"
+        url_username: "{{ artifactory_username }}"
+        url_password: "{{ artifactory_password }}"
+        force: true
+      no_log: true #To prevent passwords to be on logs
+      changed_when: false
+      register: result
+      failed_when: result.status_code != 200
+      with_dict: "{{ custom_extensions_windows }}"
+      when: 
+        - item.value.enabled|bool == True
+        - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+        - custom_extensions_source_location == 'artifactory'
+
+    - name: Copy Machine Agent custom extension files - from Local
+      ansible.windows.win_copy:
+        src: "{{ item.value.extension_file }}"
+        dest: "{{ machine_agent_dest_folder_win }}/monitors"
+        mode: 0755
+      with_dict: "{{ custom_extensions_windows }}"
+      when:
+        - item.value.enabled|bool == True
+        - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+        - custom_extensions_source_location == 'local'
+
+
+- name: Unzip extension file
+  win_unzip:
+    src: "{{ machine_agent_dest_folder_win }}/monitors/{{ item.value.extension_file }}"
+    dest: "{{ machine_agent_dest_folder_win }}/monitors/{{ item.value.extension_folder }}"
+    remote_src: yes
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+    - item.value.enabled|bool == True
+    - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+
+- name: Clean up - remove {{ item.value.extension_file }}
+  win_file:
+    path: "{{ machine_agent_dest_folder_win }}/monitors/{{ item.value.extension_file }}"
+    state: absent
+  changed_when: false
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+    - item.value.enabled|bool == True
+    - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+
+#Including task to run orchestrate.ps1
+- name: Run Orchestrate.ps1 for Config.xml
+  win_shell: "{{ machine_agent_dest_folder_win }}/monitors/{{ item.value.extension_folder }}/orchestrate.ps1"
+  args:
+    chdir: "{{ machine_agent_dest_folder_win }}/monitors/{{ item.value.extension_folder }}"
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+    - item.value.enabled|bool == True
+
+- name: Load in custom extension variables
+  include_vars:
+    file: custom_extension_vars/{{ item.value.extension_vars }}.yml
+  with_dict: "{{ custom_extensions_windows }}"
+  when: item.value.extension_vars is defined
+
+# Overwrite values with PAAS when enabled
+- name: Overwrite variables when 'is_support_group_paas' is True
+  include_vars:
+    file: custom_extension_vars/{{ item.value.extension_vars }}.paas.yml
+  with_dict: "{{ custom_extensions_windows }}"
+  when: is_support_group_paas | bool == True
+
+## Include custom business logic when defined
+- include_tasks: custom_extension_business_logic/{{ item.value.extension_business_logic }}.yml
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+    - item.value.enabled | bool == True
+    - item.value.extension_business_logic is defined
+
+# 
+- name: Overwrite variables for PaaS systems when "Cluster Service" monitoring is not enabled
+  include_vars:
+    file: custom_extension_vars/{{ item.value.extension_vars }}.paas.cluster_service_disabled.yml
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+  - is_support_group_paas | bool == True
+  - cluster_service_enabled is defined 
+  - cluster_service_enabled|bool == False
+
+# Configure
+- name: Configure Custom Extension config file - if Custom Extension is enabled
+  template:
+    src: "templates/custom_extensions/{{ item.value.extension_template }}"
+    dest: '{{ machine_agent_dest_folder_win }}/monitors/{{ item.value.extension_folder }}/config.json'
+    owner: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_user }}"
+    mode: 0755
+  changed_when: false
+  with_dict: "{{ custom_extensions_windows }}"
+  when: 
+    - item.value.enabled|bool == True
+    - item.value.extension_template is defined
+    - (is_support_group_paas|bool == True and item.value.is_paas_only|default(false)|bool == True) or item.value.is_paas_only|default(false) == False
+
+
+

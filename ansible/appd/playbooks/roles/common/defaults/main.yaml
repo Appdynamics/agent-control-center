@@ -1,0 +1,61 @@
+---
+# default agent directories. These are used by the logger role as well,
+# which is why they are defoined here rather than in the individul
+# agent directories
+appd_linux_root: /opt/appdynamics
+appd_windows_root: C:/appdynamics
+
+db_agent_dest_folder_linux: "{{ appd_linux_root }}/db-agent"
+db_agent_dest_folder_windows: "{{ appd_windows_root }}/db-agent"
+
+java_agent_dest_folder_linux: "{{ appd_linux_root }}/java-agent"
+java_agent_dest_folder_win: "{{ appd_windows_root }}/java-agent"
+
+machine_agent_dest_folder_linux: "{{ appd_linux_root }}/machine-agent"
+machine_agent_dest_folder_win: "{{ appd_windows_root }}/machine-agent"
+
+logger_role_standalone: true # used to indicate that the role is being used on its own
+
+#wheel user for Machine agent, user for DB agent
+appdynamics_user: appdynamics
+# create appdynamics_user if missing
+create_appdynamics_user: no
+############ DO NOT CHANGE ANY OF THESE DEFAULTS - Except you know what you're doing#######################
+java_system_properties: ""
+host_name: '{{ ansible_hostname }}' # computername/hostname of the target machine
+
+# Indicate that we need to initialize the agent variables. Some roles (like logger)
+# don't require all agent vars to be initialized
+init_and_validate_agent_variables: true
+
+# Agent Log level
+agent_log_level: "info"
+agent_loggers: ['com', 'com.singularity']
+
+# Analytics agnent location
+analytics_agent_host: localhost
+analytics_agent_port: 9090
+
+#windows_ma_finder_string
+win_ma_finder_string: machineagent-bundle-64bit-windows
+win_db_finder_string: db-agent-winx64
+linux_ma_finder_string: machineagent-bundle-64bit-linux
+linux_db_finder_string: db-agent
+
+# Machine Common
+ma_agent_dest_file: machine-agent.zip
+machine_hierarchy: ""
+enable_custom_extensions: false
+
+#controller defaults
+enable_ssl: false
+enable_proxy: false
+enable_proxy_authentication: false
+analytics_event_endpoint: "https://fra-ana-api.saas.appdynamics.com:443"
+controller_port: "443"
+controller_account_name: "customer1"
+controller_global_analytics_account_name: "customer1-guid"
+enable_analytics_agent: "false"
+
+#restart_app flag - Set this flag true to automatically restart service
+restart_app: false

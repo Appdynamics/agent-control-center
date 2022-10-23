@@ -1,0 +1,181 @@
+# WARNING: Before making any changes to this file read the following section carefully
+#
+# After editing the file, make sure the file follows the yml syntax. Common issues include
+# - Using tabs instead of spaces
+# - File encoding should be UTF-8
+#
+# The safest way to edit this file is to copy paste the examples provided and make the
+# necessary changes using a plain text editor instead of a WYSIWYG editor.
+#
+
+# samplingInterval indicates how often to gather metric data. Units in milliseconds.
+samplingInterval: 30000
+
+# basicEnabled indicates whether the machine agent should report the basic metrics
+# through the SIM extension. Set this to false and enable the JavaHardwareMonitor to
+# report basic metrics using the legacy Sigar-based reporting. Note, if sim-enabled is
+# set to true in controller-info.xml, then this will be ignored, and basic metrics will
+# be reported along with SIM metrics through the SIM extension.
+basicEnabled    : "true"
+
+# defaultDiskSectorSize specifies the default sector size in bytes to use for each
+# disk for which the machine agent cannot find the sector size of. This value is
+# used to calculate the number of bytes read/written for the disk.
+defaultDiskSectorSize    : 512
+
+# Set the server tags (optional). Users can tag servers and filter/search servers by tags. Each tag
+# is a key-value pair, and multiple tag values can be associated with a given tag key. An example
+# of tag is given below. The tag will have the key environment with value of production. Tag values
+# must be enclosed in single or double quotes as needed to allow unicode or to ignore any YAML
+# special characters (e.g., @, %, etc.).
+#
+tags:
+    {{ machine_custom_tags_final }}
+
+percentileMonitorConfig:
+    # percentileEnabled indicates whether the machine agent should report the percentile metrics
+    # through the SIM extension. The feature is currently supported only on Linux.
+    percentileEnabled    : "true"
+
+volumeMonitorConfig:
+    # maxNumberVolumes specifies the maximum number of volumes that the
+    # machine agent will monitor.
+    maxNumberVolumes           : 5
+
+    # whitelistSelectorRegex specifies the regular expression used to whitelist reported volumes
+    # by name. A volume with the name matching the regex will always be reported,
+    # with respect to maxNumberVolumes
+    whitelistSelectorRegex        : ""
+
+    # blacklistSelectorRegex specifies the regular expression used to blacklist reported volumes
+    # by name. A volume with the name matching the regex will never be reported, unless it also
+    # matches the whitelistSelectorRegex. By default volumes created by docker storage drivers are blacklisted.
+    # For example, /var/lib/docker/devicemapper/a24b981234c1
+    blacklistSelectorRegex        : "^/var/lib/docker/.*"
+
+    # samplingInterval indicates how often to gather metric data. Units in milliseconds.
+    # This overrides the standard sampling interval. If this is not set the standard sampling
+    # interval is used. This is currently supported only on Linux.
+    samplingInterval: 3000
+
+networkMonitorConfig:
+    # maxNumberNetworks specifies the maximum number of network interface cards that the
+    # machine agent will monitor.
+    maxNumberNetworks            : 5
+
+    # whitelistSelectorRegex specifies the regular expression used to whitelist reported networks
+    # by name. A network with the name matching the regex will always be reported,
+    # with respect to maxNumberNetworks.
+    whitelistSelectorRegex       : ""
+
+    # blacklistSelectorRegex specifies the regular expression used to blacklist reported networks
+    # by name. A network with the name matching the regex will never be reported, unless it also
+    # matches the whitelistSelectorRegex. By default, virtual network interfaces are on the blacklist.
+    blacklistSelectorRegex       : "^veth.*|^vnet.*"
+
+processMonitorConfig:
+    # maxClassIdLength specifies the maximum process class name length. Any process
+    # class name that is longer than the specified maximum below will be truncated.
+    # The global maximum of the process class name is 100. If this variable is set
+    # to be greater than 100, then the process name will be truncated at 100.
+    maxClassIdLength                 : 50
+
+    # processSelectorRegex contains a regular expression that selects which
+    # processes should be monitored by the machine agent. The regular expression is
+    # compared against the full command line that was was used to start the process.
+    # The default behavior is to monitor all non-kernel processes.
+    processSelectorRegex             : "^.+[^]]$"
+
+    # minLiveTimeMillisBeforeMonitoring specifies the minimum amount of time a
+    # process must be alive before it is monitored by the machine agent. It is
+    # useful for preventing the machine agent from being overloaded with monitoring
+    # short-lived processes.
+    minLiveTimeMillisBeforeMonitoring: 60000
+
+    # maxNumberMonitoredClasses specifies the maximum number of process classes that the
+    # machine agent will monitor.
+    maxNumberMonitoredClasses        : 20
+
+    # When assigning processes to a class, it will be done in the following order:
+    # Step #1: the processClassSelectorRegexList is applied if it contains any selectors.
+    # Step #2: the defaultProcessClassSelector regular expression, if it is defined,
+    #          will extract the process class if it hasn't been done in Step #1.
+    # Step #3: If #1 and #2 find nothing, standard classification will be used which is
+    #          to use the processName (shortened if needed).
+    #
+    # To test the effect of any of the above or custom regular expressions, use a
+    # command such as: ps -eww -o args | awk -v regex="$REGEX" '$0 ~ regex'
+
+    # processClassSelectorRegexList contains an optional set of class selectors
+    # that specify what processes are to be assigned to a defined class name.
+    # Each entry specifies a class name and a regular expression.  The regular
+    # expression is compared against the full command line.  If there are multiple
+    # matching regex, then the first one in the list is used. Any process that
+    # matches the expression is assigned to the given process class name.  An
+    # example of how to specify the processClassSelectorRegexList is given here:
+    #
+    # processClassSelectorRegexList :
+    #    machineAgentTasks: '.*java.*machineagent.*'
+    #    controllerTasks: '.*java.*controller.*'
+    #    nextOne:  '.*svchost.*'
+
+    # defaultProcessClassSelector is an optional parameter which will take a regular
+    # expression and apply it to the full command line string.  If there is a match
+    # found in the command line, it will extract the first group occurrence of the
+    # match and use that as the class id.  If left blank or if the expression does
+    # not find a match, normal selection is performed.
+    defaultProcessClassSelector      : ""
+
+    # commandLineTransformers is an optional parameter which allows portions of the process command line matching the
+    # given "regex" (regular expression) to be replaced by the given "replaceWith" text. Normally the "regex" may
+    # contain multiple groups denoted by round brackets - eg. "(key)=(value)".  To indicate which group should be
+    # replaced by the "replaceWith" text it is necessary to define the group number in the "replaceAtGroupNumbers".
+    # Defining group 2 and a replaceWith of "***" would result in: "key=***".
+    #
+    # Example: Mask out all values of command line arguments in the following java process that begin with '-Dfoo.':
+    #  java -jar -Dfoo.password=***REMOVED*** -Dfoo.secretKey=***REMOVED*** -Dagent.max=33 my_application.jar
+    # The desired result is:
+    #  java -jar -Dfoo.password=*** -Dfoo.secretKey=*** -Dagent.max=33 my_application.jar
+    #
+    # To achieve the desired results, the following parameters should be defined:
+    # commandLineTransformers         :
+    #  - regex: "(-Dfoo\\.[^\\=]+)=([^\\s]+)"
+    #    replaceAtGroupNumbers:
+    #    - 2
+    #    replaceWith: "***"
+    #
+    # Since we have defined 2 for the replaceAtGroupNumbers, this means that the first group defined in the round
+    # brackets is only used to search for the portion that will be replaced and the second group (i.e. 2) in the
+    # second set of round brackets will determine the portion that will be replaced by the replaceWith text.
+    #
+    # Here's a breakdown of the regex expression used above: '(-Dfoo\\.[^\\=]+)=([^\\s]+)'
+    # The first group '(-Dfoo\\.[^\\=]+)' means: match anything starting with the literal characters '-Dfoo.'
+    #  followed by any character that is not the equals sign (i.e. '^\\=' means NOT equals character),
+    #  and the '+' sign means match one or more such characters.
+    #  Note that in order to use a literal dot character '.', it must be escaped with backslash: '\\.' (i.e.
+    #   define as '-Dfoo\\.' to mean '-Dfoo.'
+    # The next part of the regex above is just the literal '=' character in between the two groups.
+    # The second group '([^\\s]+)' means match any character that is not the space character (i.e. '^\\s'),
+    #  and the + sign means match one or more such characters. This effectively matches all characters after the equals
+    #  sign up till the next space character as the second group - this is the portion that will be masked out.
+    # Note: when using regular expression tools such as regex101.com use single backslash: (-Dfoo\.[^\=]+)=([^\s]+)
+    #
+    # To replace values for ALL command line args, use the following:
+    # commandLineTransformers         :
+    # - regex: "(-D[^\\=]+)=([^\\s]+)"
+    #   replaceAtGroupNumbers:
+    #   - 2
+    #   replaceWith: "***"
+
+cpusMonitorConfig:
+    # samplingInterval indicates how often to gather metric data. Units in milliseconds.
+    # This overrides the standard sampling interval. If this is not set the standard sampling
+    # interval is used. This is currently supported only on Linux.
+    samplingInterval: 3000
+
+memoryMonitorConfig:
+    # samplingInterval indicates how often to gather metric data. Units in milliseconds.
+    # This overrides the standard sampling interval. If this is not set the standard sampling
+    # interval is used. This is currently supported only on Linux.
+    samplingInterval: 3000
+

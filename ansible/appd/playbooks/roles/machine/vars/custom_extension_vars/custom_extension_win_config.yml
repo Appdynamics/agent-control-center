@@ -1,0 +1,36 @@
+#Custom Extension config for event log, service monitor and task scheduler. This is all combined.
+
+#Controller Host is defined elsewhere in ansible playbook
+
+#Event attributes:
+win_appname: "165"
+win_oauthtoken: "NonPaaS"
+win_enable_events: 0
+
+#Enabling logging: values "0" (disabled) or "1" (enabled) -
+win_enable_logging: 0
+
+#Enabling scripts: Values are "0" (disabled) or "1" (enabled) -
+win_enable_event_monitor: 1 
+win_enable_service_monitor: 1 
+win_enable_task_scheduler_monitor: 1 
+win_enable_cluster_disk_monitor: 1
+win_enable_cluster_network_monitor: 1
+win_enable_cluster_node_monitor: 1
+win_enable_cluster_roles_monitor: 1
+
+win_enable_cluster_disk_space_monitor: 0
+win_enable_cluster_disk_state_monitor: 0
+win_enable_iis_pool_monitor: 0
+
+#Below are values for Event Log:
+event_log_application: '["App 1", "App2", "App3"]'
+event_log_security: '["6001", "7001"]'
+event_log_system: '["1", "23232", "444444", "77777777", "888888"]'
+windows_events_search_interval_mins: 5
+
+#Below are values for Task Scheduler:
+task_scheduler_tasks: '["Task 1", "Task 2"]'
+
+#Below are values for Service Monitor:
+service_monitor_services: '["SMS Agent Host",  "SplunkForwarder Service"]'

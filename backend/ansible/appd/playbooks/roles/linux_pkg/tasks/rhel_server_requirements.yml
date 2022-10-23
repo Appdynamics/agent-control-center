@@ -1,0 +1,8 @@
+---
+- name: Install tools and pre-requisites for RedHat variants
+  become_method: sudo # escalate privileges to install missing packages
+  yum:
+    update_cache: yes
+    name:
+     - unzip
+    state: installed

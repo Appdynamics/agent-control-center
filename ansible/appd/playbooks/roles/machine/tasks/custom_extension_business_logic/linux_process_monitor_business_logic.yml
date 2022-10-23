@@ -1,0 +1,70 @@
+---
+
+- name: Return Mail Transport Agent (MTA) symlinks
+  command: "ls -lrth /etc/alternatives/mta"
+  register: mta_symlinks
+  ignore_errors: true
+  changed_when: false
+  failed_when: "'No such file or directory' in mta_symlinks.stderr"
+
+- set_fact:
+    mta_process: "postfix"
+  when: mta_symlinks.stdout | regex_search('sendmail.postfix')
+
+- set_fact:
+    mta_process: "sendmail"
+  when: mta_symlinks.stdout | regex_search('sendmail.sendmail')
+
+- name: Print mta_process value
+  ansible.builtin.debug:
+    msg: "mta_process is '{{ mta_process }}'."
+  when: mta_process is defined
+
+- set_fact:
+    business_logic_processes_mta: "  - displayName: \"{{ mta_process }}\"\n    regex: \".*{{ mta_process }}.*\"\n"
+  when: mta_process is defined
+
+- name: Print business_logic_processes_mta value
+  ansible.builtin.debug:
+    msg: "business_logic_processes_mta is '{{ business_logic_processes_mta }}'."
+  where: business_logic_processes_mta is defined
+
+### RHEL OS version
+- name: Print ansible_distribution_major_version value
+  ansible.builtin.debug:
+    msg: "ansible_distribution_major_version is '{{ ansible_distribution_major_version }}'."
+
+- set_fact:
+    os_version_process: "ntpd"
+  when: 
+    - ansible_distribution_major_version | int == 6 or ansible_distribution_major_version | int == 7
+    - ansible_os_family == 'RedHat'
+
+- set_fact:
+    os_version_process: "chronyd"
+  when: 
+    - ansible_distribution_major_version | int == 8
+    - ansible_os_family == 'RedHat'
+
+- set_fact:
+    business_logic_processes_os_version: "  - displayName: \"{{ os_version_process }}\"\n    regex: \".*{{ os_version_process }}.*\"\n"
+  when: os_version_process is defined
+
+- name: Print business_logic_processes_os_version value
+  ansible.builtin.debug:
+    msg: "business_logic_processes_os_version is '{{ business_logic_processes_os_version }}'."
+
+### Final process list
+- set_fact:
+    business_logic_processes: |
+      {{ business_logic_processes_mta | default("")  }}
+      {{ business_logic_processes_os_version | default("")  }}
+  when: business_logic_processes_mta is defined or business_logic_processes_os_version is defined
+
+- name: Print business_logic_processes value
+  ansible.builtin.debug:
+    msg: "business_logic_processes is '{{ business_logic_processes }}'."
+
+
+
+

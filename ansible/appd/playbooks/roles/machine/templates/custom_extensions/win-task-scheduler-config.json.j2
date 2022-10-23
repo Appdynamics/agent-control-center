@@ -1,0 +1,13 @@
+{
+    "appNameOrID": "{{ task_scheduler_appname }}",
+    "controllerHost": "{{ controller_host_name }}",
+    "OAuthToken": "{{ task_scheduler_oauthtoken }}",
+
+    "EnableLogging": "{{ task_scheduler_enable_logging }}",
+    "EnableEvents": "{{ task_scheduler_enable_events }}",
+    "MonitoredTasksList": [
+        {
+            "Tasks": {{ task_scheduler_tasks }}
+        }
+    ]
+}

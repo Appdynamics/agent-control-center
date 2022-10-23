@@ -1,0 +1,109 @@
+
+
+- name: Get hierarchy file content
+  command: "cat {{ hierarchy_file_path_lin }}"
+  register: hierarchy_file_content
+  ignore_errors: true
+  changed_when: false
+  when: 
+    - hierarchy_file_path_lin is defined
+    - ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+    
+- name: Get hierarchy file content
+  win_shell: "type {{ hierarchy_file_path_win }}"
+  register: hierarchy_file_content
+  ignore_errors: true
+  changed_when: false
+  when: 
+    - hierarchy_file_path_win is defined
+    - ansible_os_family == 'Windows'
+
+- name: Print hierarchy_file_content
+  ansible.builtin.debug:
+    msg: "hierarchy_file_content is '{{ hierarchy_file_content }}'."
+
+- name: Set values based on hierarchy information
+  set_fact:
+    hierarchy_department: "{{ hierarchy_department_value }}"
+  ignore_errors: true
+  when:
+    - hierarchy_file_content.stdout is defined  
+
+#This is always defined
+- name: Set values based on OS 
+  set_fact:
+    hierarchy_os:  "{{ 'Win' if ansible_os_family == 'Windows' else 'Lin' }}"
+  ignore_errors: true
+
+- name: Set values based on support group
+  set_fact:
+    hierarchy_support_group: "{{ hierarchy_department_value }}"
+  ignore_errors: true
+  when: 
+    - hierarchy_support_group is not defined 
+
+- name: Set values based on support group
+  set_fact:
+    hierarchy_support_group: "{{ hierarchy_file_content.stdout | regex_search('support_group:.*\"(.*)\"', '\\1') | default([]) | first  }}"
+  ignore_errors: true
+  when: 
+    - hierarchy_file_content.stdout is defined 
+
+- name: Set values based on hierarchy information
+  set_fact:
+    hierarchy_sap: "{{ hierarchy_file_content.stdout | regex_search('.*(SAP).*', '\\1') | default([]) | first }}"
+  ignore_errors: true
+  when: 
+    - hierarchy_file_content.stdout is defined 
+
+- name: Set values based on hierarchy information
+  set_fact:
+    hierarchy_paas: "PaaS|" # Pipe has to be included here in case support group is false (which means hierarchy_final won't end in |)
+  ignore_errors: true
+  when: 
+    - is_support_group_paas | bool == True
+
+- name: Set values based on hierarchy information
+  set_fact:
+    hierarchy_paas: ""
+  ignore_errors: true
+  when: 
+    - is_support_group_paas | bool == False
+
+- name: Merge variables
+  set_fact: 
+      machine_hierarchy: "{{hierarchy_support_group | trim | replace(' ','') | replace('|','') }}|{{hierarchy_os}}|{{hierarchy_sap | default('NonSAP')}}|{{hierarchy_paas}}"
+  when: 
+    - hierarchy_file_content.stdout is defined 
+
+- name: Print machine_hierarchy
+  ansible.builtin.debug:
+    msg: "{{ machine_hierarchy }}"
+  when: 
+    - machine_hierarchy is defined 
+
+#Hierarchy defined in Machine-agent-controller-info.xml 
+- name: Update Machine Agent Hierarchy values - Linux OS
+  become: true
+  template:
+    src: templates/machine-agent-controller-info.xml.j2
+    dest: '{{ machine_agent_dest_folder_linux }}/conf/controller-info.xml'
+    owner: "{{ appdynamics_user }}"
+    group: "{{ appdynamics_user }}"
+    mode: 0755
+  changed_when: false
+  when: 
+    - machine_hierarchy is defined
+    - ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+
+- name: Update Machine Agent Hierarchy values - Win OS
+  template:
+    src: templates/machine-agent-controller-info.xml.j2
+    dest: '{{ machine_agent_dest_folder_win }}/conf/controller-info.xml'
+    force: yes
+  changed_when: false
+  when: 
+    - machine_hierarchy is defined
+    - ansible_os_family == 'Windows'
+
+      

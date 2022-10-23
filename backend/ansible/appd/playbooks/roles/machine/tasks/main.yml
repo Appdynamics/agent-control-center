@@ -1,0 +1,117 @@
+---
+- name: Controller URL must be provided
+  fail:
+    msg: "The variable 'controller_host_name' is empty"
+  when: (controller_host_name is not defined) or (controller_host_name|length == 0)
+
+- name: Print input_method
+  ansible.builtin.debug:
+    msg: "input_method is '{{ input_method }}'."
+
+- name: Pre-configure application/tier/node facts
+  block:
+    # note: set_fact has low precedence for existing variables
+    - name: Setting default tier name when not specified
+      set_fact:
+        tier_name_final: "{{ 'Windows' if ansible_os_family == 'Windows' else 'Linux' }}"
+      when: 
+        - application_name is defined and application_name | length > 0
+        - tier_name is not defined or tier_name | length == 0
+
+    - name: Setting default tier name when specified
+      set_fact:
+        tier_name_final: "{{ tier_name }}"
+      when: 
+        - application_name is defined and application_name | length > 0
+        - tier_name is defined and tier_name | length > 0
+
+    - name: Print application and tier name
+      ansible.builtin.debug:
+        msg: "Application name is '{{ application_name }}'. Tier name is '{{ tier_name_final }}'."
+      when: 
+        - application_name is defined and application_name | length > 0
+
+- name: Print host name
+  ansible.builtin.debug:
+    msg: "host_name is '{{ host_name }}'."
+  
+# Create appdynamics user and group
+- name: Appdynamics user and group
+  block:
+    - name: Check if user already exists
+      ansible.builtin.command: "id {{ appdynamics_user }}"
+      register: existing_user_info
+      ignore_errors: true
+      changed_when: false
+      failed_when: "'Unknown command' in existing_user_info.stderr"
+
+    - name: Print command output
+      ansible.builtin.debug:
+        msg: "{{ existing_user_info.stdout, existing_user_info.stderr }}"
+      when: existing_user_info is defined
+
+    - name: Define is_user_existing variable
+      set_fact:
+        is_user_existing: "{{ 'yes' if 'uid=' in existing_user_info.stdout else 'no' }}"
+      when: existing_user_info is defined
+
+    - name: Create appdynamics user and group
+      include_tasks: appd_user_group.yml
+      when: 
+        - is_user_existing | default(false) | bool == False
+  when: 
+    - ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+    - create_appdynamics_user | bool
+    - input_method == "install"
+
+# SysV or systemd system
+- name: Determine if SysV or systemd system
+  block:
+  - name: Get metadata file content
+    command: "file /sbin/init"  #Should this be win_shell?
+    register: file_command_output
+    ignore_errors: true
+    changed_when: false
+
+  - name: Create and add items to dictionary
+    set_fact: 
+        is_sysV: "{{ file_command_output.stdout | regex_search('.*lib/systemd/systemd.*') == none }}"
+    when: 
+      - file_command_output is defined
+
+  - name: Print is_sysV
+    ansible.builtin.debug:
+      msg: "is_sysV is '{{ is_sysV }}'."
+  
+  when: 
+    - ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+
+# Download Agent
+- include_tasks: download_machine_agent_linux.yml
+  when: 
+    - ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+    - input_method == "install"
+
+- include_tasks: configure_machine_agent_linux.yml
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+
+- include_tasks: download_machine_agent_win.yml
+  when: ansible_os_family == 'Windows'
+
+- include_tasks: configure_tags.yml
+
+- include_tasks: configure_hierarchy.yml
+
+#Download and Configure Custom Extensions
+- include_tasks: configure_custom_extensions_linux.yml
+  when: enable_custom_extensions | bool == True and (ansible_os_family == 'RedHat' or ansible_os_family == 'Debian')
+
+- include_tasks: configure_custom_extensions_win.yml
+  when: enable_custom_extensions | bool == True and ansible_os_family == 'Windows'
+
+# Install machine agent
+- include_tasks: install_machine_agent_linux.yml
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+
+- include_tasks: install_machine_agent_win.yml
+  when: ansible_os_family == 'Windows'

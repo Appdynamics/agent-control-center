@@ -1,0 +1,13 @@
+---
+#- name: Update apt cache
+#  apt: 
+#   update_cache: yes
+#   force_apt_get: yes
+
+- name: Install tools and pre-requisites for Debian variants
+  become_method: sudo # escalate privileges to install missing packages
+  apt:
+    state: present
+    update_cache: yes
+    name:
+    - unzip
